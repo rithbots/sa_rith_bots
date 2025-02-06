@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rith - Store</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-router@3.5.3/dist/vue-router.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family:  sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .product-card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <div id="app">
+        <!-- Navigation Bar -->
+        <nav class="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <router-link to="/" class="text-xl font-bold text-black">Om Sovannrith</router-link>
+                    <router-link to="/cart" class="relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700 hover:text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span v-if="cartItemCount" class="absolute -top-2 -right-2 bg-black text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            {{cartItemCount }}
+                        </span>
+                    </router-link>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Add padding to body to account for fixed navbar -->
+        <div class="pt-20">
+            <!-- Main Content -->
+            <router-view></router-view>
+        </div>
+    </div>
+
+    
+
+    <!-- Product List Component Template -->
+    <script type="text/x-template" id="product-list-template">
+        <div class="container mx-auto px-6 py-6">
+            <!-- Header with Category Filter -->
+            <div class="mb-12 text-center">
+                <h1 class="text-4xl font-bold text-black mb-2">Welcome to Our Store</h1>
+                <p class="text-gray-600 mb-6">Discover our collection</p>
+            </div>
+
+            <!-- Loading State -->
+            <transition name="fade">
+                <div v-if="loading" class="fixed inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-black mx-auto"></div>
+                        <p class="mt-4 text-gray-600">Loading...</p>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Products Grid -->
+            <transition name="fade" mode="out-in">
+                <div v-if="filteredProducts.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                    <div v-for="product in filteredProducts" 
+                         :key="product.id"
+                         class="product-card rounded-lg overflow-hidden">
+                        <div class="relative pt-[60%]">
+                            <!-- Rating Badge -->
+                            <!-- <div class="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 bg-white">
+                                <span class="text-yellow-400">★</span>
+                                <span class="font-semibold">{{ product.rating.rate }}</span>
+                                <span class="opacity-75 text-sm">({{ product.rating.count }})</span>
+                            </div> -->
+                            
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <img :src="product.image" 
+                                    :alt="product.title"
+                                    class="w-full h-full object-contain p-6 bg-white product-image"
+                                    :style="{ viewTransitionName: 'product-' + product.id }"
+                                    @load="handleImageLoad(product.id)"
+                                    v-show="loadedImages[product.id]">
+                                <div v-if="!loadedImages[product.id]" 
+                                     class="absolute inset-0 m-6 skeleton rounded-lg"></div>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <!-- <div class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100">
+                                    {{ formatCategory(product.category) }}
+                                </div> -->
+                                <span class="text-lg font-bold text-black">US ${{ product.price.toFixed(2) }}</span>
+                            </div>
+                            <h2 class="text-black text-m mb-3 line-clamp-2 min-h-[3.5rem]">
+                                {{ product.title }}
+                            </h2>
+                            <!-- <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ product.description }}</p> -->
+                            <button class="w-full font-semibold py-3 px-4 rounded-lg transition-all duration-200 mb-3 bg-black text-white hover:bg-gray-800"
+                                    @click="addToCart(product)">
+                                Add to Cart
+                            </button>
+                            <router-link :to="'/product/' + product.id"
+                               class="block w-full text-center py-3 px-4 rounded-lg transition-all duration-200 border-2 text-gray-600 hover:bg-gray-50">
+                                View Details
+                            </router-link>
+                        </div>
+                    </div>
+                </div>
+                <div v-else-if="!loading" class="text-center py-12">
+                    <p class="text-gray-600 text-lg">No products found in this category.</p>
+                </div>
+            </transition>
+        </div>
+    </script>
+
+    <!-- Product Detail Component Template -->
+    <script type="text/x-template" id="product-detail-template">
+        <div class="container mx-auto px-4 py-8">
+            <!-- Loading State -->
+            <transition name="fade">
+                <div v-if="loading" class="fixed inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-black mx-auto"></div>
+                        <p class="mt-4 text-gray-600">Loading product details...</p>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Product Details -->
+            <div v-if="product" class="bg-white-800 rounded-lg shadow-lg overflow-hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
+                    <!-- Product Image -->
+                    <div class="relative w-full max-w-md bg-white rounded-lg overflow-hidden mx-auto"> 
+                        <img :src="product.image" 
+                             :alt="product.title" 
+                             class="w-full h-auto object-contain p-8 product-image"> 
+                    </div>
+
+                    <!-- Product Info -->
+                    <div class="space-y-6">
+                        <div class="space-y-2">
+                            <!-- <div class="inline-block px-3 py-1 rounded-full text-sm font-medium bg-gray-100"
+                                 :style="getCategoryStyle(product)">
+                                {{ formatCategory(product.category) }}
+                            </div> -->
+
+                            <div class="text-2xl font-bold text-black"> US ${{ product.price.toFixed(2) }}</div>
+
+                            <h1 class="text-lg  text-black">{{ product.title }}</h1>
+
+                            
+
+                            <!-- <div class="flex items-center gap-2">
+                                <span class="text-yellow-400">★</span>
+                                <span class="font-semibold text-white">{{ product.rating.rate }}</span>
+                                <span class="text-gray-400">({{ product.rating.count }} reviews)</span>
+                            </div> -->
+                        </div>
+
+                        <p class="text-gray-600">{{ product.description }}</p>
+
+                        
+
+                        <button @click="addToCart"
+                            class="w-full md:w-auto px-8 py-3 rounded-lg font-semibold transition-all duration-200 bg-black text-white hover:bg-gray-800">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <!-- Cart Component Template -->
+    <script type="text/x-template" id="cart-template">
+        <div class="container max-w-2xl mx-auto px-4 py-8">
+            <div class="flex flex-col text-center mb-8">
+                <h1 class="text-3xl text-center text-black">Shopping Cart</h1>
+                <!-- <router-link to="/" class="text-black hover:text-gray-700 font-medium">← Continue Shopping</router-link> -->
+            </div>
+
+            <div v-if="!cartItems.length" class="text-center py-12">
+                <p class="text-gray-600 text-lg mb-4">Your cart is empty</p>
+                <!-- <router-link to="/" class="inline-block bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
+                    Start Shopping
+                </router-link> -->
+            </div>
+
+            <div v-else >
+                <!-- Cart Items -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div v-for="item in cartItems" :key="item.id" 
+                         class="bg-white rounded-lg p-4 flex items-center gap-4 shadow-sm">
+                        <img :src="item.image" :alt="item.title" class="w-24 h-24 object-contain">
+                        <div class="flex-grow">
+                            <h3 class="font-medium text-black mb-1">{{ item.title }}</h3>
+                            <p class="text-gray-600 text-sm mb-2">${{ item.price.toFixed(2) }} each</p>
+                            <div class="flex items-center gap-2">
+                                <button @click="updateQuantity(item, -1)" 
+                                        class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100">
+                                    -
+                                </button>
+                                <span class="w-12 text-center">{{ item.quantity }}</span>
+                                <button @click="updateQuantity(item, 1)"
+                                        class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <span class="font-bold text-black">${{ (item.price * item.quantity).toFixed(2) }}</span>
+                            <button @click="removeItem(item)" 
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Summary -->
+                <div class="bg-white rounded-lg p-6 h-fit shadow-sm">
+                    <h2 class="text-xl font-bold text-black mb-4">Order Summary</h2>
+                    <div class="space-y-3 mb-6">
+                        <div class="flex justify-between text-gray-700">
+                            <span>Subtotal</span>
+                            <span>${{ subtotal.toFixed(2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-700">
+                            <span>Tax (10%)</span>
+                            <span>${{ tax.toFixed(2) }}</span>
+                        </div>
+                        <div class="h-px bg-gray-200"></div>
+                        <div class="flex justify-between font-bold text-black text-lg">
+                            <span>Total</span>
+                            <span>${{ total.toFixed(2) }}</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <button @click="checkout"
+                                class="w-full max-w-md mx-auto bg-black text-white py-3 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors">
+                            Proceed to Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <!-- Checkout Success Template -->
+    <script type="text/x-template" id="checkout-success-template">
+        <div class="container mx-auto px-4 py-16 text-center">
+            <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+                <div class="w-16 h-16 bg-white-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-8 h-8 text-black-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-black mb-4">Order Confirmed!</h1>
+                <p class="text-gray-600 mb-6">Thank you for your purchase.</p>
+                <div class="space-y-4 mb-6">
+                    <button @click="printInvoice" class="w-full bg-gray-100 text-black px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                        Print Invoice
+                    </button>
+                    
+                    <button @click="showTelegramForm" class="w-full bg-gray-50 text-black-600 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.28-.02-.12.02-1.98 1.26-5.61 3.71-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.84-.28-1.51-.43-1.45-.91.03-.25.38-.51 1.05-.78 4.12-1.79 6.87-2.97 8.26-3.54 3.93-1.62 4.75-1.9 5.27-1.91.12 0 .37.03.54.18.14.12.18.28.2.45-.02.14-.02.3-.03.42z"/>
+                        </svg>
+                        Send via Telegram
+                    </button>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <!-- card payment -->
+    <script type="text/x-template" id="payment-form-template">
+        <div class="space-y-6">
+            <!-- Card Preview Section -->
+            <!-- <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="w-12">
+                        <svg class="w-full h-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 4H3C1.89543 4 1 4.89543 1 6V18C1 19.1046 1.89543 20 3 20H21C22.1046 20 23 19.1046 23 18V6C23 4.89543 22.1046 4 21 4Z" stroke="#000000" stroke-width="2"/>
+                            <path d="M1 10H23" stroke="#000000" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="text-black text-sm font-medium">SECURE PAYMENT</div>
+                </div>
+                <div class="font-mono text-xl text-black tracking-wider mb-4">{{ cardNumber || '•••• •••• •••• ••••' }}</div>
+                <div class="flex justify-between text-gray-600 text-sm">
+                    <span>{{ expiry || 'MM/YY' }}</span>
+                    <span>{{ cvvMask }}</span>
+                </div>
+            </div> -->
+    
+            <!-- Payment Form -->
+            <form @submit.prevent="validateAndSubmit" class="space-y-4">
+                <!-- Card Number Input -->
+                <div class="relative">
+                    <label class="absolute -top-2 left-2 px-2 bg-white text-xs font-medium"
+                           :class="errors.cardNumber ? 'text-red-600' : 'text-gray-600'">
+                        Card Number
+                    </label>
+                    <input type="text" v-model="cardNumber"
+                           class="mt-1 block w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-white"
+                           :class="errors.cardNumber ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-black focus:ring-gray-200'"
+                           placeholder="1234 5678 9012 3456"
+                           maxlength="19"
+                           @input="formatCardNumber">
+                    <div class="mt-1 text-xs" :class="errors.cardNumber ? 'text-red-500' : 'text-gray-500'">
+                        {{ errors.cardNumber || 'Enter a valid 13-19 digit card number' }}
+                    </div>
+                </div>
+    
+                <!-- Expiry and CVV Inputs -->
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Expiry Date Input -->
+                    <div class="relative">
+                        <label class="absolute -top-2 left-2 px-2 bg-white text-xs font-medium"
+                               :class="errors.expiry ? 'text-red-600' : 'text-gray-600'">
+                            Expiry Date
+                        </label>
+                        <input type="text" v-model="expiry"
+                               class="mt-1 block w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-white"
+                               :class="errors.expiry ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-black focus:ring-gray-200'"
+                               placeholder="MM/YY"
+                               maxlength="5"
+                               @input="formatExpiry">
+                        <div class="mt-1 text-xs" :class="errors.expiry ? 'text-red-500' : 'text-gray-500'">
+                            {{ errors.expiry || 'MM/YY format' }}
+                        </div>
+                    </div>
+    
+                    <!-- CVV Input -->
+                    <div class="relative">
+                        <label class="absolute -top-2 left-2 px-2 bg-white text-xs font-medium"
+                               :class="errors.cvv ? 'text-red-600' : 'text-gray-600'">
+                            CVV
+                        </label>
+                        <input type="password" v-model="cvv"
+                               class="mt-1 block w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 bg-white"
+                               :class="errors.cvv ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-black focus:ring-gray-200'"
+                               placeholder="123"
+                               maxlength="4"
+                               @input="formatCvv">
+                        <div class="mt-1 text-xs" :class="errors.cvv ? 'text-red-500' : 'text-gray-500'">
+                            {{ errors.cvv || '3-4 digits' }}
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </script>
+
+    <!-- Telegram bot -->
+    <script type="text/x-template" id="telegram-form-template">
+        <form @submit.prevent="validateAndSubmit" class="space-y-6 text-black">
+            <div class="relative">
+                <label class="absolute -top-2.5 left-3 px-2 bg-white text-xs font-semibold tracking-wide"
+                       :class="errors.token ? 'text-black' : 'text-gray-800'">
+                    Bot Token
+                </label>
+                <input type="text" v-model="token"
+                       class="mt-1 block w-full px-4 py-3.5 rounded-lg border transition-all duration-200 bg-white shadow-sm"
+                       :class="errors.token ? 'border-black focus:border-gray-900 focus:ring-2 focus:ring-gray-300' : 'border-gray-500 focus:border-black focus:ring-2 focus:ring-gray-200'"
+                       placeholder="">
+                <div class="mt-2 flex items-center gap-1.5 text-xs text-gray-600">
+                    <span>{{ errors.token }}</span>
+                </div>
+            </div>
+            <div class="relative">
+                <label class="absolute -top-2.5 left-3 px-2 bg-white text-xs font-semibold tracking-wide"
+                       :class="errors.chatId ? 'text-black' : 'text-gray-800'">
+                    Chat ID
+                </label>
+                <input type="text" v-model="chatId"
+                       class="mt-1 block w-full px-4 py-3.5 rounded-lg border transition-all duration-200 bg-white shadow-sm"
+                       :class="errors.chatId ? 'border-black focus:border-gray-900 focus:ring-2 focus:ring-gray-300' : 'border-gray-500 focus:border-black focus:ring-2 focus:ring-gray-200'"
+                       placeholder="">
+                <div class="mt-2 flex items-center gap-1.5 text-xs text-gray-600">
+                    <span>{{ errors.chatId }}</span>
+                </div>
+            </div>
+        </form>
+    </script>
+
+    <script src="utils.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
