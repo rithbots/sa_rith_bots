@@ -391,6 +391,43 @@
         </div>
     </script>
 
+    <!-- Add these templates before closing body tag -->
+    <script type="text/x-template" id="invoice-template">
+        <div class="p-8 bg-white">
+            <div class="flex justify-between items-center mb-8">
+                <div class="text-3xl font-bold text-gray-800">INVOICE</div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-600">Date: {{ date }}</div>
+                    <div class="text-sm font-medium text-gray-800">Invoice #: {{ invoiceNumber }}</div>
+                </div>
+            </div>
+            <table class="w-full mb-8">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="text-left py-3 px-4 text-gray-600 text-sm font-medium">Item</th>
+                        <th class="text-right py-3 px-4 text-gray-600 text-sm font-medium">Quantity</th>
+                        <th class="text-right py-3 px-4 text-gray-600 text-sm font-medium">Price</th>
+                        <th class="text-right py-3 px-4 text-gray-600 text-sm font-medium">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="item in items" :key="item.id" class="border-b border-gray-100">
+                        <td class="py-4 px-4">{{ item.title }}</td>
+                        <td class="text-right py-4 px-4">{{ item.quantity }}</td>
+                        <td class="text-right py-4 px-4">${{ item.price.toFixed(2) }}</td>
+                        <td class="text-right py-4 px-4">${{ (item.price * item.quantity).toFixed(2) }}</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-right py-4 px-4 font-bold text-gray-700">Total:</td>
+                        <td class="text-right py-4 px-4 font-bold text-gray-800">${{ total.toFixed(2) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </script>
+
     <!-- Telegram bot -->
     <script type="text/x-template" id="telegram-form-template">
         <form @submit.prevent="validateAndSubmit" class="space-y-6 text-black">
